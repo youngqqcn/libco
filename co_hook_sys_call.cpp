@@ -45,6 +45,7 @@
 #include "co_routine.h"
 #include "co_routine_inner.h"
 #include "co_routine_specific.h"
+#include "co_comm.h"
 
 typedef long long ll64_t;
 
@@ -79,7 +80,7 @@ typedef ssize_t (*recvfrom_pfn_t)(int socket, void *buffer, size_t length,
 	                 int flags, struct sockaddr *address,
 					               socklen_t *address_len);
 
-typedef size_t (*send_pfn_t)(int socket, const void *buffer, size_t length, int flags);
+typedef ssize_t (*send_pfn_t)(int socket, const void *buffer, size_t length, int flags);
 typedef ssize_t (*recv_pfn_t)(int socket, void *buffer, size_t length, int flags);
 
 typedef int (*poll_pfn_t)(struct pollfd fds[], nfds_t nfds, int timeout);
@@ -98,6 +99,7 @@ typedef char *(*getenv_pfn_t)(const char *name);
 typedef hostent* (*gethostbyname_pfn_t)(const char *name);
 typedef res_state (*__res_state_pfn_t)();
 typedef int (*__poll_pfn_t)(struct pollfd fds[], nfds_t nfds, int timeout);
+typedef int (*gethostbyname_r_pfn_t)(const char* __restrict name, struct hostent* __restrict __result_buf, char* __restrict __buf, size_t __buflen, struct hostent** __restrict __result, int* __restrict __h_errnop);
 
 static socket_pfn_t g_sys_socket_func 	= (socket_pfn_t)dlsym(RTLD_NEXT,"socket");
 static connect_pfn_t g_sys_connect_func = (connect_pfn_t)dlsym(RTLD_NEXT,"connect");
@@ -124,6 +126,7 @@ static getenv_pfn_t g_sys_getenv_func   =  (getenv_pfn_t)dlsym(RTLD_NEXT,"getenv
 static __res_state_pfn_t g_sys___res_state_func  = (__res_state_pfn_t)dlsym(RTLD_NEXT,"__res_state");
 
 static gethostbyname_pfn_t g_sys_gethostbyname_func = (gethostbyname_pfn_t)dlsym(RTLD_NEXT, "gethostbyname");
+static gethostbyname_r_pfn_t g_sys_gethostbyname_r_func = (gethostbyname_r_pfn_t)dlsym(RTLD_NEXT, "gethostbyname_r");
 
 static __poll_pfn_t g_sys___poll_func = (__poll_pfn_t)dlsym(RTLD_NEXT, "__poll");
 
@@ -672,9 +675,6 @@ int fcntl(int fildes, int cmd, ...)
 		case F_GETFD:
 		{
 			ret = g_sys_fcntl_func( fildes,cmd );
-      if (lp && !(lp->user_flag & O_NONBLOCK)) {
-          ret = ret & (~O_NONBLOCK);
-      }
 			break;
 		}
 		case F_SETFD:
@@ -686,6 +686,9 @@ int fcntl(int fildes, int cmd, ...)
 		case F_GETFL:
 		{
 			ret = g_sys_fcntl_func( fildes,cmd );
+			if (lp && !(lp->user_flag & O_NONBLOCK)) {
+				ret = ret & (~O_NONBLOCK);
+			}
 			break;
 		}
 		case F_SETFL:
@@ -914,6 +917,39 @@ struct hostent *gethostbyname(const char *name)
 
 }
 
+int co_gethostbyname_r(const char* __restrict name,
+                       struct hostent* __restrict __result_buf,
+                       char* __restrict __buf, size_t __buflen,
+                       struct hostent** __restrict __result,
+                       int* __restrict __h_errnop) {
+  static __thread clsCoMutex* tls_leaky_dns_lock = NULL; 
+  if(tls_leaky_dns_lock == NULL) {
+    tls_leaky_dns_lock = new clsCoMutex();
+  }
+  clsSmartLock auto_lock(tls_leaky_dns_lock);
+  return g_sys_gethostbyname_r_func(name, __result_buf, __buf, __buflen,
+                                    __result, __h_errnop);
+}
+
+int gethostbyname_r(const char* __restrict name,
+                    struct hostent* __restrict __result_buf,
+                    char* __restrict __buf, size_t __buflen,
+                    struct hostent** __restrict __result,
+                    int* __restrict __h_errnop) {
+  HOOK_SYS_FUNC(gethostbyname_r);
+
+#if defined( __APPLE__ ) || defined( __FreeBSD__ )
+	return g_sys_gethostbyname_r_func( name );
+#else
+  if (!co_is_enable_sys_hook()) {
+    return g_sys_gethostbyname_r_func(name, __result_buf, __buf, __buflen,
+                                      __result, __h_errnop);
+  }
+
+  return co_gethostbyname_r(name, __result_buf, __buf, __buflen, __result,
+                            __h_errnop);
+#endif
+}
 
 struct res_state_wrap
 {
@@ -992,7 +1028,7 @@ struct hostent *co_gethostbyname(const char *name)
 #endif
 
 
-void co_enable_hook_sys() //这函数必须在这里,否则本文件会被忽略！！！
+void co_enable_hook_sys() //杩欏嚱鏁板繀椤诲湪杩欓噷,鍚﹀垯鏈枃浠朵細琚拷鐣ワ紒锛侊紒
 {
 	stCoRoutine_t *co = GetCurrThreadCo();
 	if( co )
