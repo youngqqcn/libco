@@ -67,7 +67,7 @@ public:\
 		T* p = (T*)co_getspecific( _routine_key_##name );\
 		if( !p )\
 		{\
-			p = (T*)new(1,sizeof( T ));\
+			p = (T*)new T;\
 			int ret = co_setspecific( _routine_key_##name,p) ;\
             if ( ret )\
             {\
