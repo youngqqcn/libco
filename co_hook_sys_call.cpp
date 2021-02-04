@@ -832,7 +832,7 @@ int setenv(const char *n, const char *value, int overwrite)
 				if( overwrite || !e->value  )
 				{
 					if( e->value ) free( e->value );
-					e->value = ( value ? strdup( value ) : 0 );
+					e->value = ( (NULL != value) ? strdup( value ) : 0 );
 				}
 				return 0;
 			}
@@ -1010,8 +1010,8 @@ struct hostent *co_gethostbyname(const char *name)
 	int *h_errnop = &(__co_hostbuf_wrap->host_errno);
 
 	int ret = -1;
-	while (ret = gethostbyname_r(name, host, __co_hostbuf_wrap->buffer, 
-				__co_hostbuf_wrap->iBufferSize, &result, h_errnop) == ERANGE && 
+	while ((ret = gethostbyname_r(name, host, __co_hostbuf_wrap->buffer, 
+				__co_hostbuf_wrap->iBufferSize, &result, h_errnop)) == ERANGE && 
 				*h_errnop == NETDB_INTERNAL )
 	{
 		free(__co_hostbuf_wrap->buffer);
