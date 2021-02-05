@@ -29,15 +29,16 @@
 void* RoutineFunc(void* args)
 {
 	co_enable_hook_sys();
-	int* routineid = (int*)args;
+	int routineid = *((int*)args);
 	while (true)
 	{
 		char sBuff[128];
-		sprintf(sBuff, "from routineid %d stack addr %p\n", *routineid, sBuff);
+		sprintf(sBuff, "from routineid %d stack addr %p\n", routineid, &sBuff[0]);
 
 		printf("%s", sBuff);
 		poll(NULL, 0, 1000); //sleep 1s
 	}
+    printf("\n");
 	return NULL;
 }
 
