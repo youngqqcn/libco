@@ -2,7 +2,8 @@ cmake_minimum_required(VERSION 2.8)
 project(libco CXX C ASM)
 
 if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE "Release")
+#   set(CMAKE_BUILD_TYPE "Release")
+  set(CMAKE_BUILD_TYPE "Debug")
 endif()
 
 # This for mac osx only

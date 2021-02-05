@@ -7,7 +7,7 @@
 * you may not use this file except in compliance with the License. 
 * You may obtain a copy of the License at
 *
-*	http://www.apache.org/licenses/LICENSE-2.0
+*    http://www.apache.org/licenses/LICENSE-2.0
 *
 * Unless required by applicable law or agreed to in writing, 
 * software distributed under the License is distributed on an "AS IS" BASIS, 
@@ -23,61 +23,47 @@
 coctx_swap:
 
 #if defined(__i386__)
-    movl 4(%esp), %eax
-    movl %esp,  28(%eax)
+    leal 4(%esp), %edx // sp
+    movl 4(%esp), %eax // param1
+    movl %edx, 28(%eax)
     movl %ebp, 24(%eax)
     movl %esi, 20(%eax)
     movl %edi, 16(%eax)
-    movl %edx, 12(%eax)
-    movl %ecx, 8(%eax)
     movl %ebx, 4(%eax)
-
-
-    movl 8(%esp), %eax
+    movl 0(%esp), %edx // ret func addr
+    movl %edx, 0(%eax)
+    
+    movl 8(%esp), %eax // param2
     movl 4(%eax), %ebx
-    movl 8(%eax), %ecx
-    movl 12(%eax), %edx
     movl 16(%eax), %edi
     movl 20(%eax), %esi
     movl 24(%eax), %ebp
     movl 28(%eax), %esp
-
-	ret
+    jmp *(%eax)
 
 #elif defined(__x86_64__)
-	leaq (%rsp),%rax
+    leaq 8(%rsp), %rax       // rsp + 8 -> rax
     movq %rax, 104(%rdi)
     movq %rbx, 96(%rdi)
-    movq %rcx, 88(%rdi)
-    movq %rdx, 80(%rdi)
-	  movq 0(%rax), %rax
-	  movq %rax, 72(%rdi) 
-    movq %rsi, 64(%rdi)
-	  movq %rdi, 56(%rdi)
+    movq -8(%rax), %rdx
+    movq %rdx, 72(%rdi)     // ret func addr
     movq %rbp, 48(%rdi)
-    movq %r8, 40(%rdi)
-    movq %r9, 32(%rdi)
     movq %r12, 24(%rdi)
     movq %r13, 16(%rdi)
     movq %r14, 8(%rdi)
-    movq %r15, (%rdi)
-	  xorq %rax, %rax
-
-    movq 48(%rsi), %rbp
-    movq 104(%rsi), %rsp
-    movq (%rsi), %r15
+    movq %r15, 0(%rdi)
+    movq %rsi, 64(%rdi)     // param
+    movq %rdi, 56(%rdi)     // param
+    
+    movq 0(%rsi), %r15
     movq 8(%rsi), %r14
     movq 16(%rsi), %r13
     movq 24(%rsi), %r12
-    movq 32(%rsi), %r9
-    movq 40(%rsi), %r8
-    movq 56(%rsi), %rdi
-    movq 80(%rsi), %rdx
-    movq 88(%rsi), %rcx
+    movq 48(%rsi), %rbp
+    movq 72(%rsi), %rax     // ret func addr
     movq 96(%rsi), %rbx
-		leaq 8(%rsp), %rsp
-		pushq 72(%rsi)
-
-    movq 64(%rsi), %rsi
-	ret
+    movq 104(%rsi), %rsp
+    movq 56(%rsi), %rdi     // param
+    movq 64(%rsi), %rsi     // param
+    jmp *%rax
 #endif
